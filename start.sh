@@ -7,6 +7,19 @@ set -e
 
 echo "🚀 Iniciando n8n em modo DESENVOLVIMENTO..."
 
+# Detectar qual comando Docker Compose usar
+if command -v docker-compose &> /dev/null; then
+    DOCKER_COMPOSE="docker-compose"
+    echo "ℹ️  Usando: docker-compose (standalone)"
+elif docker compose version &> /dev/null; then
+    DOCKER_COMPOSE="docker compose"
+    echo "ℹ️  Usando: docker compose (Docker CLI plugin - recomendado)"
+else
+    echo "❌ Erro: Docker Compose não encontrado!"
+    echo "   Instale o Docker Compose v2: https://docs.docker.com/compose/install/"
+    exit 1
+fi
+
 # Criar pastas necessárias
 echo "📁 Criando estrutura de pastas..."
 mkdir -p docker_data/mysql
@@ -22,7 +35,7 @@ chmod -R 755 docker_data/
 
 # Iniciar containers
 echo "🐳 Iniciando containers Docker..."
-docker-compose up -d
+$DOCKER_COMPOSE up -d
 
 # Aguardar alguns segundos
 echo "⏳ Aguardando containers iniciarem..."
@@ -32,11 +45,11 @@ sleep 5
 echo ""
 echo "✅ Containers iniciados!"
 echo ""
-docker-compose ps
+$DOCKER_COMPOSE ps
 echo ""
 echo "📊 Acesse os serviços:"
 echo "  - n8n: http://localhost:5678"
 echo "  - phpMyAdmin: http://localhost:8080"
 echo ""
-echo "📝 Ver logs: docker-compose logs -f"
-echo "🛑 Parar: docker-compose down"
+echo "📝 Ver logs: $DOCKER_COMPOSE logs -f"
+echo "🛑 Parar: $DOCKER_COMPOSE down"

@@ -17,8 +17,38 @@ Este repositório tem como objetivo facilitar a criação de um ambiente n8n usa
 
 ## Pré-requisitos
 
-- Docker
-- Docker Compose
+- **Docker** (versão 20.10 ou superior)
+- **Docker Compose**
+
+### Sobre Docker Compose
+
+Existem duas versões do Docker Compose:
+
+#### ✅ Recomendado: Docker Compose V2 (plugin integrado)
+```bash
+# Comando: docker compose (sem hífen)
+docker compose version
+```
+- **Mais novo e mantido ativamente**
+- Integrado ao Docker CLI
+- Melhor performance
+- Instalado automaticamente com Docker Desktop
+- Linux: Vem com as versões mais recentes do Docker Engine
+
+#### ⚠️  Legado: Docker Compose V1 (standalone)
+```bash
+# Comando: docker-compose (com hífen)
+docker-compose version
+```
+- Versão antiga (standalone Python)
+- Ainda funciona, mas não é mais recomendado
+- Suportado pelos scripts deste projeto para compatibilidade
+
+**Os scripts deste projeto detectam automaticamente qual versão você tem instalada e usam o comando correto!**
+
+Se você não tiver nenhuma das duas versões, instale o Docker Compose V2:
+- **Docker Desktop**: Já vem incluído
+- **Linux**: [Instruções de instalação](https://docs.docker.com/compose/install/linux/)
 
 ## Instalação
 
@@ -98,6 +128,7 @@ sudo ./start.sh
 ```
 
 O script `start.sh` vai:
+- Detectar automaticamente se você usa `docker-compose` ou `docker compose`
 - Criar as pastas necessárias
 - Ajustar permissões automaticamente
 - Iniciar os containers
@@ -119,12 +150,19 @@ sudo chown -R 999:999 docker_data/mysql
 sudo chmod -R 755 docker_data/
 
 # Iniciar containers
+# Use 'docker compose' (recomendado) OU 'docker-compose' (legado)
+docker compose up -d
+# OU
 docker-compose up -d
 ```
 
 ### Verificar o status dos containers
 
 ```bash
+# V2 (recomendado)
+docker compose ps
+
+# V1 (legado)
 docker-compose ps
 ```
 
@@ -132,28 +170,34 @@ docker-compose ps
 
 ```bash
 # Ver todos os logs
-docker-compose logs -f
+docker compose logs -f    # V2
+docker-compose logs -f    # V1
 
 # Ver apenas logs do n8n
-docker-compose logs -f n8n
+docker compose logs -f n8n    # V2
+docker-compose logs -f n8n    # V1
 
 # Ver apenas logs do MySQL
-docker-compose logs -f mysql
+docker compose logs -f mysql    # V2
+docker-compose logs -f mysql    # V1
 
 # Ver apenas logs do phpMyAdmin
-docker-compose logs -f phpmyadmin
+docker compose logs -f phpmyadmin    # V2
+docker-compose logs -f phpmyadmin    # V1
 ```
 
 ### Parar os serviços
 
 ```bash
-docker-compose down
+docker compose down    # V2 (recomendado)
+docker-compose down    # V1 (legado)
 ```
 
 ### Reiniciar os serviços
 
 ```bash
-docker-compose restart
+docker compose restart    # V2 (recomendado)
+docker-compose restart    # V1 (legado)
 ```
 
 #### Acesso aos Serviços (Desenvolvimento)
@@ -217,6 +261,7 @@ sudo ./start-prod.sh
 ```
 
 O script `start-prod.sh` vai:
+- Detectar automaticamente se você usa `docker-compose` ou `docker compose`
 - Verificar se o .env está configurado
 - Criar as pastas necessárias
 - Ajustar permissões automaticamente
@@ -237,6 +282,9 @@ sudo chown -R root:root docker_data/letsencrypt
 sudo chmod -R 755 docker_data/
 
 # Iniciar containers
+# Use 'docker compose' (recomendado) OU 'docker-compose' (legado)
+docker compose -f docker-compose.prod.yml up -d
+# OU
 docker-compose -f docker-compose.prod.yml up -d
 ```
 
@@ -260,18 +308,24 @@ Após iniciar em modo produção, os certificados SSL serão emitidos automatica
 #### Gerenciamento da Produção
 
 ```bash
-# Ver logs
+# Ver logs (V2 recomendado / V1 legado)
+docker compose -f docker-compose.prod.yml logs -f
 docker-compose -f docker-compose.prod.yml logs -f
 
 # Ver logs do Traefik (gerenciador SSL)
+docker compose -f docker-compose.prod.yml logs -f traefik
 docker-compose -f docker-compose.prod.yml logs -f traefik
 
 # Parar serviços
+docker compose -f docker-compose.prod.yml down
 docker-compose -f docker-compose.prod.yml down
 
 # Reiniciar serviços
+docker compose -f docker-compose.prod.yml restart
 docker-compose -f docker-compose.prod.yml restart
 ```
+
+**Dica:** Se você usar os scripts `start.sh` ou `start-prod.sh`, eles mostrarão os comandos corretos para seu sistema no final da execução!
 
 ## Estrutura de Dados
 
@@ -299,6 +353,8 @@ tar -xzf backup-n8n-YYYYMMDD.tar.gz
 
 ## Troubleshooting
 
+**Nota sobre comandos:** Os exemplos abaixo usam `docker compose` (V2 recomendado). Se você usa a versão legado, substitua por `docker-compose`.
+
 ### Desenvolvimento
 
 #### O n8n não consegue conectar ao MySQL
@@ -312,7 +368,7 @@ Se você vir o erro `EACCES: permission denied, open '/home/node/.n8n/config'`, 
 **Opção 1 - Usar o script (recomendado):**
 ```bash
 # Parar os containers
-docker-compose down
+docker compose down
 
 # Rodar o script que ajusta tudo
 sudo ./start.sh
@@ -321,7 +377,7 @@ sudo ./start.sh
 **Opção 2 - Ajustar permissões manualmente:**
 ```bash
 # Parar os containers
-docker-compose down
+docker compose down
 
 # Ajustar ownership para o UID do n8n (1000)
 sudo chown -R 1000:1000 docker_data/n8n/
@@ -330,19 +386,19 @@ sudo chown -R 1000:1000 docker_data/n8n/
 sudo chmod -R 755 docker_data/n8n/
 
 # Reiniciar
-docker-compose up -d
+docker compose up -d
 ```
 
 **Opção 3 - Resetar pasta do n8n:**
 ```bash
 # Parar os containers
-docker-compose down
+docker compose down
 
 # Remover apenas a pasta do n8n
 rm -rf docker_data/n8n/
 
 # Reiniciar (o Docker criará a pasta com permissões corretas)
-docker-compose up -d
+docker compose up -d
 ```
 
 #### Resetar todos os dados
@@ -350,9 +406,9 @@ docker-compose up -d
 **CUIDADO: Isso apagará todos os dados!**
 
 ```bash
-docker-compose down
+docker compose down
 rm -rf docker_data/
-docker-compose up -d
+docker compose up -d
 ```
 
 ### Produção
@@ -364,7 +420,7 @@ Se você vir o erro `EACCES: permission denied` nos logs do n8n em produção:
 **Opção 1 - Usar o script (recomendado):**
 ```bash
 # Parar os containers
-sudo docker-compose -f docker-compose.prod.yml down
+sudo docker compose -f docker-compose.prod.yml down
 
 # Rodar o script que ajusta tudo
 sudo ./start-prod.sh
@@ -373,7 +429,7 @@ sudo ./start-prod.sh
 **Opção 2 - Ajustar manualmente:**
 ```bash
 # Parar os containers
-sudo docker-compose -f docker-compose.prod.yml down
+sudo docker compose -f docker-compose.prod.yml down
 
 # Ajustar ownership
 sudo chown -R 1000:1000 docker_data/n8n/
@@ -382,7 +438,7 @@ sudo chown -R 1000:1000 docker_data/n8n/
 sudo chmod -R 755 docker_data/n8n/
 
 # Reiniciar
-sudo docker-compose -f docker-compose.prod.yml up -d
+sudo docker compose -f docker-compose.prod.yml up -d
 ```
 
 #### Certificado SSL não está sendo emitido
@@ -402,7 +458,7 @@ nslookup pma.seudominio.com
 
 3. Verifique os logs do Traefik:
 ```bash
-docker-compose -f docker-compose.prod.yml logs traefik
+docker compose -f docker-compose.prod.yml logs traefik
 ```
 
 4. Aguarde alguns minutos - o Let's Encrypt pode demorar para emitir o certificado.
@@ -418,12 +474,12 @@ chmod -R 755 docker_data/letsencrypt/
 
 1. Verifique se todos os containers estão rodando:
 ```bash
-docker-compose -f docker-compose.prod.yml ps
+docker compose -f docker-compose.prod.yml ps
 ```
 
 2. Verifique os logs:
 ```bash
-docker-compose -f docker-compose.prod.yml logs -f
+docker compose -f docker-compose.prod.yml logs -f
 ```
 
 3. Teste se o servidor está acessível:

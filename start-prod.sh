@@ -7,6 +7,19 @@ set -e
 
 echo "🚀 Iniciando n8n em modo PRODUÇÃO..."
 
+# Detectar qual comando Docker Compose usar
+if command -v docker-compose &> /dev/null; then
+    DOCKER_COMPOSE="docker-compose"
+    echo "ℹ️  Usando: docker-compose (standalone)"
+elif docker compose version &> /dev/null; then
+    DOCKER_COMPOSE="docker compose"
+    echo "ℹ️  Usando: docker compose (Docker CLI plugin - recomendado)"
+else
+    echo "❌ Erro: Docker Compose não encontrado!"
+    echo "   Instale o Docker Compose v2: https://docs.docker.com/compose/install/"
+    exit 1
+fi
+
 # Verificar se .env existe
 if [ ! -f .env ]; then
     echo "❌ Erro: Arquivo .env não encontrado!"
@@ -53,7 +66,7 @@ fi
 
 # Iniciar containers
 echo "🐳 Iniciando containers Docker em modo produção..."
-docker-compose -f docker-compose.prod.yml up -d
+$DOCKER_COMPOSE -f docker-compose.prod.yml up -d
 
 # Aguardar alguns segundos
 echo "⏳ Aguardando containers iniciarem..."
@@ -63,7 +76,7 @@ sleep 5
 echo ""
 echo "✅ Containers iniciados!"
 echo ""
-docker-compose -f docker-compose.prod.yml ps
+$DOCKER_COMPOSE -f docker-compose.prod.yml ps
 echo ""
 echo "📊 Acesse os serviços:"
 echo "  - n8n: https://${N8N_SUBDOMAIN}.${DOMAIN}"
@@ -72,6 +85,6 @@ echo ""
 echo "⚠️  IMPORTANTE: O certificado SSL pode demorar alguns minutos para ser emitido."
 echo "   Aguarde 2-3 minutos e acesse os URLs acima."
 echo ""
-echo "📝 Ver logs: docker-compose -f docker-compose.prod.yml logs -f"
-echo "🔒 Ver logs SSL: docker-compose -f docker-compose.prod.yml logs -f traefik"
-echo "🛑 Parar: docker-compose -f docker-compose.prod.yml down"
+echo "📝 Ver logs: $DOCKER_COMPOSE -f docker-compose.prod.yml logs -f"
+echo "🔒 Ver logs SSL: $DOCKER_COMPOSE -f docker-compose.prod.yml logs -f traefik"
+echo "🛑 Parar: $DOCKER_COMPOSE -f docker-compose.prod.yml down"
