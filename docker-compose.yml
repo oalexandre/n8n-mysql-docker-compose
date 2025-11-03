@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: n8n-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - ${DATA_FOLDER}/mysql:/var/lib/mysql
+    ports:
+      - "${MYSQL_PORT}:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    restart: unless-stopped
+    environment:
+      - DB_TYPE=mysqldb
+      - DB_MYSQLDB_HOST=mysql
+      - DB_MYSQLDB_PORT=3306
+      - DB_MYSQLDB_DATABASE=${MYSQL_DATABASE}
+      - DB_MYSQLDB_USER=${MYSQL_USER}
+      - DB_MYSQLDB_PASSWORD=${MYSQL_PASSWORD}
+      - N8N_BASIC_AUTH_ACTIVE=${N8N_BASIC_AUTH_ACTIVE}
+      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD}
+      - N8N_HOST=${N8N_HOST}
+      - N8N_PORT=${N8N_PORT}
+      - N8N_PROTOCOL=${N8N_PROTOCOL}
+    ports:
+      - "${N8N_PORT}:5678"
+    volumes:
+      - ${DATA_FOLDER}/n8n:/home/node/.n8n
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: n8n-phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    ports:
+      - "${PHPMYADMIN_PORT}:80"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  mysql_data:
+  n8n_data:

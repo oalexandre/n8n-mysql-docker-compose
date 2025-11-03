@@ -1,0 +1,117 @@
+version: '3.8'
+
+services:
+  traefik:
+    image: traefik:v3.0
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      # Enable Docker provider
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      # Entrypoints
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      # Redirect HTTP to HTTPS
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
+      # Let's Encrypt
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.email=${LETSENCRYPT_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      # Dashboard (opcional, comente se não quiser)
+      - "--api.dashboard=true"
+      - "--api.insecure=false"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "${DATA_FOLDER}/letsencrypt:/letsencrypt"
+    networks:
+      - traefik-network
+
+  mysql:
+    image: mysql:8.0
+    container_name: n8n-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - ${DATA_FOLDER}/mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - traefik-network
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    restart: unless-stopped
+    environment:
+      - DB_TYPE=mysqldb
+      - DB_MYSQLDB_HOST=mysql
+      - DB_MYSQLDB_PORT=3306
+      - DB_MYSQLDB_DATABASE=${MYSQL_DATABASE}
+      - DB_MYSQLDB_USER=${MYSQL_USER}
+      - DB_MYSQLDB_PASSWORD=${MYSQL_PASSWORD}
+      - N8N_BASIC_AUTH_ACTIVE=${N8N_BASIC_AUTH_ACTIVE}
+      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD}
+      - N8N_HOST=${N8N_SUBDOMAIN}.${DOMAIN}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=https
+      - WEBHOOK_URL=https://${N8N_SUBDOMAIN}.${DOMAIN}/
+    volumes:
+      - ${DATA_FOLDER}/n8n:/home/node/.n8n
+    depends_on:
+      mysql:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      # HTTP Router
+      - "traefik.http.routers.n8n.rule=Host(`${N8N_SUBDOMAIN}.${DOMAIN}`)"
+      - "traefik.http.routers.n8n.entrypoints=websecure"
+      - "traefik.http.routers.n8n.tls.certresolver=letsencrypt"
+      - "traefik.http.services.n8n.loadbalancer.server.port=5678"
+    networks:
+      - traefik-network
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: n8n-phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      PMA_ABSOLUTE_URI: https://${PHPMYADMIN_SUBDOMAIN}.${DOMAIN}/
+    depends_on:
+      mysql:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      # HTTP Router
+      - "traefik.http.routers.phpmyadmin.rule=Host(`${PHPMYADMIN_SUBDOMAIN}.${DOMAIN}`)"
+      - "traefik.http.routers.phpmyadmin.entrypoints=websecure"
+      - "traefik.http.routers.phpmyadmin.tls.certresolver=letsencrypt"
+      - "traefik.http.services.phpmyadmin.loadbalancer.server.port=80"
+    networks:
+      - traefik-network
+
+networks:
+  traefik-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  n8n_data:
+  letsencrypt:
