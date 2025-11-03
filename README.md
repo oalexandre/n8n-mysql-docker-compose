@@ -12,6 +12,8 @@ Este repositório tem como objetivo facilitar a criação de um ambiente n8n usa
 - **Backup Facilitado**: Como os dados estão persistidos em uma pasta local, basta fazer backup da pasta `docker_data/`
 - **SSL Automático em Produção**: Traefik + Let's Encrypt para HTTPS automático com renovação de certificados
 - **Dois Modos**: Desenvolvimento (localhost) e Produção (domínio próprio com SSL)
+- **Scripts de Inicialização**: `start.sh` e `start-prod.sh` configuram tudo automaticamente
+- **Funciona com sudo**: Configurado para funcionar perfeitamente mesmo rodando Docker com sudo
 
 ## Pré-requisitos
 
@@ -35,6 +37,8 @@ cp .env.example .env
 ```bash
 nano .env
 ```
+
+**Nota:** Não precisa criar pastas manualmente. Os scripts `start.sh` e `start-prod.sh` fazem isso automaticamente!
 
 ## Configuração
 
@@ -81,11 +85,40 @@ Este projeto suporta dois ambientes: **Desenvolvimento** e **Produção**.
 
 ### Modo Desenvolvimento (Localhost)
 
-Use o arquivo `docker-compose.yml` para desenvolvimento local:
+#### Iniciar os serviços (Recomendado)
 
-#### Iniciar os serviços
+Use o script de inicialização que configura tudo automaticamente:
 
 ```bash
+# Forma simples (recomendado)
+./start.sh
+
+# Ou com sudo se necessário
+sudo ./start.sh
+```
+
+O script `start.sh` vai:
+- Criar as pastas necessárias
+- Ajustar permissões automaticamente
+- Iniciar os containers
+- Mostrar os URLs de acesso
+
+#### Iniciar manualmente (Alternativa)
+
+Se preferir iniciar manualmente:
+
+```bash
+# Criar pastas
+mkdir -p docker_data/n8n docker_data/mysql
+
+# Ajustar ownership (n8n=UID 1000, MySQL=UID 999)
+sudo chown -R 1000:1000 docker_data/n8n
+sudo chown -R 999:999 docker_data/mysql
+
+# Ajustar permissões (755 é mais seguro que 777)
+sudo chmod -R 755 docker_data/
+
+# Iniciar containers
 docker-compose up -d
 ```
 
@@ -173,7 +206,37 @@ N8N_BASIC_AUTH_PASSWORD=senha-admin-forte
 ```
 
 2. Inicie os serviços em modo produção:
+
+**Forma Simples (Recomendado):**
 ```bash
+# Com o script que configura tudo automaticamente
+./start-prod.sh
+
+# Ou com sudo se necessário
+sudo ./start-prod.sh
+```
+
+O script `start-prod.sh` vai:
+- Verificar se o .env está configurado
+- Criar as pastas necessárias
+- Ajustar permissões automaticamente
+- Iniciar os containers em modo produção
+- Mostrar os URLs de acesso
+
+**Forma Manual (Alternativa):**
+```bash
+# Criar pastas
+mkdir -p docker_data/n8n docker_data/mysql docker_data/letsencrypt
+
+# Ajustar ownership (n8n=UID 1000, MySQL=UID 999)
+sudo chown -R 1000:1000 docker_data/n8n
+sudo chown -R 999:999 docker_data/mysql
+sudo chown -R root:root docker_data/letsencrypt
+
+# Ajustar permissões (755 é mais seguro que 777)
+sudo chmod -R 755 docker_data/
+
+# Iniciar containers
 docker-compose -f docker-compose.prod.yml up -d
 ```
 
@@ -242,12 +305,44 @@ tar -xzf backup-n8n-YYYYMMDD.tar.gz
 
 Aguarde alguns segundos para o MySQL inicializar completamente. O docker-compose está configurado com healthcheck, mas pode demorar um pouco.
 
-#### Erro de permissão na pasta docker_data
+#### Erro de permissão na pasta docker_data (n8n não inicia)
 
-Certifique-se de que o Docker tem permissão para criar e acessar a pasta:
+Se você vir o erro `EACCES: permission denied, open '/home/node/.n8n/config'`, o n8n não consegue escrever na pasta. Solução:
 
+**Opção 1 - Usar o script (recomendado):**
 ```bash
-chmod -R 755 docker_data/
+# Parar os containers
+docker-compose down
+
+# Rodar o script que ajusta tudo
+sudo ./start.sh
+```
+
+**Opção 2 - Ajustar permissões manualmente:**
+```bash
+# Parar os containers
+docker-compose down
+
+# Ajustar ownership para o UID do n8n (1000)
+sudo chown -R 1000:1000 docker_data/n8n/
+
+# Ajustar permissões
+sudo chmod -R 755 docker_data/n8n/
+
+# Reiniciar
+docker-compose up -d
+```
+
+**Opção 3 - Resetar pasta do n8n:**
+```bash
+# Parar os containers
+docker-compose down
+
+# Remover apenas a pasta do n8n
+rm -rf docker_data/n8n/
+
+# Reiniciar (o Docker criará a pasta com permissões corretas)
+docker-compose up -d
 ```
 
 #### Resetar todos os dados
@@ -261,6 +356,34 @@ docker-compose up -d
 ```
 
 ### Produção
+
+#### n8n não inicia - Erro de permissão
+
+Se você vir o erro `EACCES: permission denied` nos logs do n8n em produção:
+
+**Opção 1 - Usar o script (recomendado):**
+```bash
+# Parar os containers
+sudo docker-compose -f docker-compose.prod.yml down
+
+# Rodar o script que ajusta tudo
+sudo ./start-prod.sh
+```
+
+**Opção 2 - Ajustar manualmente:**
+```bash
+# Parar os containers
+sudo docker-compose -f docker-compose.prod.yml down
+
+# Ajustar ownership
+sudo chown -R 1000:1000 docker_data/n8n/
+
+# Ajustar permissões
+sudo chmod -R 755 docker_data/n8n/
+
+# Reiniciar
+sudo docker-compose -f docker-compose.prod.yml up -d
+```
 
 #### Certificado SSL não está sendo emitido
 
@@ -318,6 +441,21 @@ echo | openssl s_client -servername n8n.seudominio.com -connect n8n.seudominio.c
 ```
 
 ## Segurança
+
+### Permissões de Arquivos
+
+Este projeto usa permissões seguras configuradas automaticamente pelos scripts:
+
+- **n8n**: Pasta `docker_data/n8n/` pertence ao UID 1000 (usuário `node` no container)
+- **MySQL**: Pasta `docker_data/mysql/` pertence ao UID 999 (usuário `mysql` no container)
+- **Traefik**: Pasta `docker_data/letsencrypt/` pertence ao root
+- **Permissões**: 755 (rwxr-xr-x) - somente o dono pode escrever, outros podem ler
+
+**Por que NÃO usar 777?**
+- ✅ **755**: Seguro - apenas o processo correto pode modificar os dados
+- ❌ **777**: Inseguro - qualquer processo pode modificar os dados
+
+Os scripts `start.sh` e `start-prod.sh` configuram isso automaticamente usando `chown` e `chmod 755`.
 
 ### Geral
 - **SEMPRE** altere as senhas padrão do arquivo `.env`
