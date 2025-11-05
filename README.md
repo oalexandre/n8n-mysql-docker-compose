@@ -159,6 +159,21 @@ tar -xzf backup-n8n-YYYYMMDD.tar.gz
 
 ## Troubleshooting
 
+### Erro de migração: "Duplicate column name 'versionCounter'"
+
+Este erro ocorre quando há inconsistência entre o estado do banco de dados e as migrações do n8n.
+
+**Solução automática**: O script `start-prod.sh` agora detecta e corrige este problema automaticamente. Basta executar:
+
+```bash
+sudo ./start-prod.sh
+```
+
+O script irá:
+1. Verificar se a coluna `versionCounter` já existe
+2. Marcar a migração como executada no banco de dados
+3. Reiniciar o n8n automaticamente
+
 ### n8n não inicia (erro de permissão)
 
 ```bash
